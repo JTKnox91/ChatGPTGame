@@ -97,6 +97,17 @@ restart_text = restart_font.render("Press SPACE to restart", True, WHITE)
 restart_text_rect = restart_text.get_rect(center=(width // 2, height // 2 - 20))  # Adjust the position of the restart text
 
 
+def is_score_high_enough(player_score):
+    if player_score <= 0:
+        return False
+    high_scores = load_high_scores()
+    if ((len(high_scores) < 5)):
+        return True
+    if player_score > high_scores[-1]['score']:
+        return True
+    else:
+        return False
+
 def load_high_scores():
     high_scores = []
     try:
@@ -195,7 +206,7 @@ while True:
         high_scores = load_high_scores()
 
         # Check if the player achieved a high score
-        if input_active and ((len(high_scores) < 5 or score > high_scores[-1]['score'])):
+        if input_active and is_score_high_enough(score):
             input_rect = pygame.Rect(300, 250, 45, 32)  # Adjust the position and size of the input box
         else:
             input_active = False
