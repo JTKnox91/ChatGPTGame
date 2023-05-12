@@ -88,16 +88,17 @@ all_sprites.add(player)
 
 game_over = False
 score = 0
+initials = ""
+input_active = True  # Flips to false if score is too low OR if already entered.
 
 game_over_font = pygame.font.SysFont(None, 60)  # Increase the game over text size
 restart_font = pygame.font.SysFont(None, 24)
 restart_text = restart_font.render("Press SPACE to restart", True, WHITE)
 restart_text_rect = restart_text.get_rect(center=(width // 2, height // 2 - 20))  # Adjust the position of the restart text
 
-# Add a list to store the high scores and initials
-high_scores = []
 
 def load_high_scores():
+    high_scores = []
     try:
         with open("high_scores.txt", "r") as file:
             lines = file.readlines()
@@ -106,16 +107,18 @@ def load_high_scores():
                 high_scores.append({"score": int(score), "initials": initials.upper()})
     except FileNotFoundError:
         pass
+    return high_scores
+
+load_high_scores();
 
 def update_high_scores():
+    high_scores = load_high_scores()
     high_scores.append({"score": score, "initials": initials.upper()})
     high_scores.sort(key=lambda x: x["score"], reverse=True)
     high_scores = high_scores[:5]  # Keep only the top 5 scores
     with open("high_scores.txt", "w") as file:
         for entry in high_scores:
             file.write(f"{entry['score']},{entry['initials']}\n")
-
-load_high_scores()
 
 # Game loop
 while True:
@@ -135,24 +138,21 @@ while True:
                     player.rect.y += player.speed
         else:
             if event.type == KEYDOWN and event.key == K_SPACE:
-                # Restart the game
+                # Reset game entities
                 game_over = False
                 all_sprites.empty()
-                objects.empty()
-                player = Player()
                 all_sprites.add(player)
+                objects.empty()
+                # Reset scoreboard logic
                 score = 0
-
-                # Reset the input box and flags for high scores
                 initials = ""
-                input_active = False
+                input_active = True # Flips to false if score is too low OR if already entered.
 
             if event.type == KEYDOWN and input_active:
                 if event.key == K_RETURN:
                     # Save initials and update high scores
                     if initials != "":
                         update_high_scores()
-                        initials = ""
                         input_active = False
                 elif event.key == K_BACKSPACE:
                     # Remove the last character from initials
@@ -194,13 +194,13 @@ while True:
         screen.blit(game_over_text, game_over_text_rect)
         screen.blit(restart_text, restart_text_rect)
 
-        input_active = False
-        initials = ""
+        high_scores = load_high_scores()
 
         # Check if the player achieved a high score
-        if score > 0 and (len(high_scores) < 5 or score > high_scores[-1]['score']):
-            input_active = True
+        if input_active and ((len(high_scores) < 5 or score > high_scores[-1]['score'])):
             input_rect = pygame.Rect(300, 250, 45, 32)  # Adjust the position and size of the input box
+        else:
+            input_active = False
 
         # Draw the high scores
         high_scores_text = high_scores_font.render("HIGH SCORES:", True, WHITE)
@@ -210,9 +210,9 @@ while True:
         y_offset = 0
         for i, entry in enumerate(high_scores):
             ranking = f"#{i+1}"  # Calculate the ranking
-            initials = entry["initials"]
-            score = entry["score"]
-            high_score_text = score_font.render(f"{ranking}: {initials}: {score}", True, WHITE)
+            old_initials = entry["initials"]
+            old_score = entry["score"]
+            high_score_text = score_font.render(f"{ranking}: {old_initials}: {old_score}", True, WHITE)
             high_score_text_rect = high_score_text.get_rect(center=(width // 2, height // 2 + 105 + y_offset))
             screen.blit(high_score_text, high_score_text_rect)
             y_offset += 30
