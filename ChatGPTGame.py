@@ -20,6 +20,9 @@ CONSTANTS
 # Window dimensions
 WIDTH, HEIGHT = 640, 480
 
+# Limits the rendering speed.
+FRAME_RATE = 60 #fps
+
 # Colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -44,18 +47,13 @@ clock = pygame.time.Clock()
 player = None # The Player Sprite
 game_over = None # Boolean whether the game is running or over
 level = 0 #The Current game level
+high_score_input = None # The high_score_input object for 
 
 # Sprite Groups
 all_sprites = None
 falling_objects = None
 shooting_objects = None
 building_objects = None
-
-# High Score Controls TODO: This could become its own self-managed class
-is_cursor_visible = None
-cursor_timer = None
-initials = None # Player initials
-input_active = True  # Flips to false if score is too low OR if already entered.
 
 """
 SPRITE CLASSES
@@ -248,6 +246,51 @@ class FallingPowerUpObject(FallingObject):
     def __init__(self):
         super(FallingPowerUpObject, self).__init__("coin.png", 5)
 
+
+"""
+NON-SPRITE CLASSES
+"""
+class HighScoreInput():
+    def __init__(self):
+        self.__is_cursor_visible = True
+        self.__cursor_timer = 0
+        self.__initials = ""
+        self.__input_active = True  # Flips to false if score is too low OR if already entered.
+
+    def write_letter(self, letter):
+        if len(self.__input) < 3:
+            self.__initials += letter
+
+    def backspace(self):
+        if len(self.__input) > 0:
+            self.__initials = self.__initials[:-1]
+
+    def can_save_initials(self):
+        """ Returns boolean whether the initials are saveable. Call before saving to avoid an error. """
+        return self.__input_active and len(self.__input) > 0
+
+    def save_initials(self):
+        """
+        Returns the current state of initials after marking the input as inactive.
+        
+        Can only be called once.
+        """
+        if self.can_save_initials:
+            self.__input_active = False
+            return self.__initials
+        else :
+            raise Exception("Initials" + self.__initials + "are not saveable") 
+        
+    def update(self):
+        """
+        Updates the blinking high_score_input visibility.
+        
+        If called once per frame, high_score_input blink will cycle on/off once per second.
+        """
+        self.__cursor_timer += 1
+        if (self.__cursor_timer % (int(FRAME_RATE / 2)) == 0):
+            self.__is_cursor_visible = ! self.__is_cursor_visible
+
 """
 UTILITIES
 """
@@ -295,6 +338,13 @@ def draw_powerup_indicator():
         power_up_y = power_up_spacing * 2
         screen.blit(power_up_image, (power_up_x, power_up_y))
 
+def is_score_high_enough(high_scores, player_score):
+    if player_score <= 0:
+        return False
+    if (len(high_scores) < 5:
+        return True
+    return int(player.score) > int(high_scores[-1]['score'])
+
 def restart_game():
     """
         Reset everything except for the screen and the clock itself
@@ -302,8 +352,7 @@ def restart_game():
         Should be called at the start of every new game.
     """
     global all_sprites, falling_objects, shooting_objects, building_objects
-    global player, game_over, level
-    global is_cursor_visible, cursor_timer, initials, input_active
+    global player, game_over, level, high_score_input
 
     pygame.mixer.music.play()  # Start music at beginning then play on loop.
 
@@ -326,12 +375,7 @@ def restart_game():
     player = Player()
     game_over = False
     level = 0
-
-    is_cursor_visible = True
-    cursor_timer = 0
-    initials = ""
-    input_active = True  # Flips to false if score is too low OR if already entered.
-
+    high_score_input = HighScoreInput()
 
 """
 GAME LOOP
@@ -443,7 +487,7 @@ while True:
         high_scores = load_high_scores()
 
         # Check if the player achieved a high score
-        if input_active and ((len(high_scores) < 5 or int(player.score) > int(high_scores[-1]['score']))):
+        if input_active and is_score_high_enough(high_scores, player.score):
             input_rect = pygame.Rect(300, 250, 45, 32)  # Adjust the position and size of the input box
         else:
             input_active = False
@@ -470,7 +514,7 @@ while True:
             high_score_label_rect = high_score_label.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 150))
             screen.blit(high_score_label, high_score_label_rect)
 
-            if len(initials) == 3 or not is_cursor_visible:
+            if len(initials) == 3 or not is_high_score_input_visible:
                 player_score_text = GAME_OVER_FONT.render(str(player.score), True, WHITE)
                 player_score_text_rect = player_score_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
                 screen.blit(player_score_text, player_score_text_rect)
@@ -479,16 +523,16 @@ while True:
             initials_text = SCORE_FONT.render(initials.upper(), True, WHITE)
             screen.blit(initials_text, input_rect.move(5, 8))
 
-            # Draw the blinking cursor if the length of initials is less than 3
-            if len(initials) < 3 and is_cursor_visible:
-                cursor_rect = pygame.Rect(input_rect.x + initials_text.get_width() + 2, input_rect.y + input_rect.height // 2 - 10, 12, input_rect.height - 14)
-                pygame.draw.rect(screen, WHITE, cursor_rect)
+            # Draw the blinking high_score_input if the length of initials is less than 3
+            if len(initials) < 3 and is_high_score_input_visible:
+                high_score_input_rect = pygame.Rect(input_rect.x + initials_text.get_width() + 2, input_rect.y + input_rect.height // 2 - 10, 12, input_rect.height - 14)
+                pygame.draw.rect(screen, WHITE, high_score_input_rect)
             
-            # Update the cursor timer
-            cursor_timer += 1
-            if cursor_timer >= 30:
-                is_cursor_visible = not is_cursor_visible
-                cursor_timer = 0  # Reset the timer
+            # Update the high_score_input timer
+            high_score_input_timer += 1
+            if high_score_input_timer >= 30:
+                is_high_score_input_visible = not is_high_score_input_visible
+                high_score_input_timer = 0  # Reset the timer
 
     # Draw the score
     score_text = SCORE_FONT.render(f"Score: {player.score}", True, WHITE)
@@ -501,4 +545,4 @@ while True:
     draw_powerup_indicator()
 
     pygame.display.flip()
-    clock.tick(60)
+    clock.tick(FRAME_RATE)
