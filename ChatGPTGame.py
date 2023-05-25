@@ -251,35 +251,26 @@ class FallingPowerUpObject(FallingObject):
 NON-SPRITE CLASSES
 """
 class HighScoreInput():
+    """
+    A class to contain and manage the state of the highscore input.
+
+    TODO: Figure out how to make this draw all of its parts
+    """
     def __init__(self):
-        self.__is_cursor_visible = True
         self.__cursor_timer = 0
-        self.__initials = ""
-        self.__input_active = True  # Flips to false if score is too low OR if already entered.
+        self.__max_letters = 3
+        self.initials = ""
 
     def write_letter(self, letter):
-        if len(self.__input) < 3:
-            self.__initials += letter
+        if len(self.initials) < self.__max_letters:
+            self.initials += letter.upper()
 
     def backspace(self):
-        if len(self.__input) > 0:
-            self.__initials = self.__initials[:-1]
+        if len(self.initials) > 0:
+            self.initials = self.initials[:-1]
 
-    def can_save_initials(self):
-        """ Returns boolean whether the initials are saveable. Call before saving to avoid an error. """
-        return self.__input_active and len(self.__input) > 0
-
-    def save_initials(self):
-        """
-        Returns the current state of initials after marking the input as inactive.
-        
-        Can only be called once.
-        """
-        if self.can_save_initials:
-            self.__input_active = False
-            return self.__initials
-        else :
-            raise Exception("Initials" + self.__initials + "are not saveable") 
+    def is_not_empty(self):
+        return len(self.initials) > 0
         
     def update(self):
         """
@@ -288,12 +279,16 @@ class HighScoreInput():
         If called once per frame, high_score_input blink will cycle on/off once per second.
         """
         self.__cursor_timer += 1
-        if (self.__cursor_timer % (int(FRAME_RATE / 2)) == 0):
-            self.__is_cursor_visible = ! self.__is_cursor_visible
+        if self.__cursor_timer > FRAME_RATE:
+            self.__cursor_timer = 0
 
-    def draw(self):
-        """ The input will draw itself on the screen"""
-
+    def is_cursor_visible(self):
+        """
+        Whether the blinking cursor whould be displayed
+        
+        False during the back-half of the blink cycle, or if the max characters are reached.
+        """
+        return len(self.initials) < self.__max_letters and self.__cursor_timer < FRAME_RATE / 2
 
 """
 UTILITIES
@@ -323,9 +318,9 @@ def load_high_scores():
         pass
     return high_scores
 
-def update_high_scores():
+def update_high_scores(new_score, new_initialis):
     high_scores = load_high_scores()
-    high_scores.append({"score": player.score, "initials": initials.upper()})
+    high_scores.append({"score": new_score, "initials": new_initialis})
     high_scores.sort(key=lambda x: x["score"], reverse=True)
     high_scores = high_scores[:5]  # Keep only the top 5 scores
     with open("high_scores.txt", "w") as file:
@@ -379,7 +374,7 @@ def restart_game():
     player = Player()
     game_over = False
     level = 0
-    high_score_input = HighScoreInput()
+    high_score_input = HighScoreInput() # Should set to None after initials are saved
 
 """
 GAME LOOP
@@ -397,18 +392,16 @@ while True:
             if event.type == KEYDOWN and event.key == K_SPACE:
                 restart_game();
 
-            elif event.type == KEYDOWN and input_active:
+            elif event.type == KEYDOWN and high_score_input is not None:
                 if event.key == K_RETURN:
                     # Save initials and update high scores
-                    if initials != "":
-                        update_high_scores()
-                        input_active = False
+                    if high_score_input.is_not_empty():
+                        update_high_scores(player.score, high_score_input.initials)
+                        high_score_input = None # To prevent future edits
                 elif event.key == K_BACKSPACE:
-                    # Remove the last character from initials
-                    initials = initials[:-1]
-                elif len(initials) < 3:
-                    # Append the pressed key to initials until there are 3 characters
-                    initials += event.unicode
+                    high_score_input.backspace()
+                else:
+                    high_score_input.write_letter(event.unicode)
 
     if not game_over:
 
@@ -488,15 +481,10 @@ while True:
         screen.blit(game_over_text, game_over_text_rect)
         screen.blit(restart_text, restart_text_rect)
 
+        # Load the high scores from file
         high_scores = load_high_scores()
 
-        # Check if the player achieved a high score
-        if input_active and is_score_high_enough(high_scores, player.score):
-            input_rect = pygame.Rect(300, 250, 45, 32)  # Adjust the position and size of the input box
-        else:
-            input_active = False
-
-        # Draw the high scores
+        # Draw the old high scores
         high_scores_text = HIGH_SCORE_FONT.render("HIGH SCORES:", True, WHITE)
         high_scores_text_rect = high_scores_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 75))
         screen.blit(high_scores_text, high_scores_text_rect)
@@ -511,32 +499,34 @@ while True:
             screen.blit(high_score_text, high_score_text_rect)
             y_offset += 28
 
-        # Draw the input box if active
-        if input_active:
+        # Check if the player achieved a new high score,
+        # if so (and they haven't already saved it), draw the input box for initials
+        if high_score_input is not None and is_score_high_enough(high_scores, player.score):
+            input_rect = pygame.Rect(300, 250, 45, 32) # Position of the input box
                        
             high_score_label = GAME_OVER_FONT.render("HIGH SCORE!", True, WHITE)
             high_score_label_rect = high_score_label.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 150))
             screen.blit(high_score_label, high_score_label_rect)
 
-            if len(initials) == 3 or not is_high_score_input_visible:
-                player_score_text = GAME_OVER_FONT.render(str(player.score), True, WHITE)
-                player_score_text_rect = player_score_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
-                screen.blit(player_score_text, player_score_text_rect)
+            # if len(initials) == 3 or not is_high_score_input_visible:
+            #     player_score_text = GAME_OVER_FONT.render(str(player.score), True, WHITE)
+            #     player_score_text_rect = player_score_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
+            #     screen.blit(player_score_text, player_score_text_rect)
 
             pygame.draw.rect(screen, WHITE, input_rect, 2)
-            initials_text = SCORE_FONT.render(initials.upper(), True, WHITE)
+            initials_text = SCORE_FONT.render(high_score_input.initials, True, WHITE)
             screen.blit(initials_text, input_rect.move(5, 8))
 
             # Draw the blinking high_score_input if the length of initials is less than 3
-            if len(initials) < 3 and is_high_score_input_visible:
+            if high_score_input.is_cursor_visible():
                 high_score_input_rect = pygame.Rect(input_rect.x + initials_text.get_width() + 2, input_rect.y + input_rect.height // 2 - 10, 12, input_rect.height - 14)
                 pygame.draw.rect(screen, WHITE, high_score_input_rect)
             
-            # Update the high_score_input timer
-            high_score_input_timer += 1
-            if high_score_input_timer >= 30:
-                is_high_score_input_visible = not is_high_score_input_visible
-                high_score_input_timer = 0  # Reset the timer
+            # Update the cursor timer
+            high_score_input.update()
+        else:
+            # Set to None to avoid looping through old scores next frame
+            high_score_input = None
 
     # Draw the score
     score_text = SCORE_FONT.render(f"Score: {player.score}", True, WHITE)
