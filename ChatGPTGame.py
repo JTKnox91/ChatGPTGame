@@ -291,6 +291,10 @@ class HighScoreInput():
         if (self.__cursor_timer % (int(FRAME_RATE / 2)) == 0):
             self.__is_cursor_visible = ! self.__is_cursor_visible
 
+    def draw(self):
+        """ The input will draw itself on the screen"""
+
+
 """
 UTILITIES
 """
@@ -341,7 +345,7 @@ def draw_powerup_indicator():
 def is_score_high_enough(high_scores, player_score):
     if player_score <= 0:
         return False
-    if (len(high_scores) < 5:
+    if len(high_scores) < 5:
         return True
     return int(player.score) > int(high_scores[-1]['score'])
 
