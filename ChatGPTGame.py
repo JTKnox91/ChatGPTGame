@@ -508,11 +508,6 @@ while True:
             high_score_label_rect = high_score_label.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 150))
             screen.blit(high_score_label, high_score_label_rect)
 
-            # if len(initials) == 3 or not is_high_score_input_visible:
-            #     player_score_text = GAME_OVER_FONT.render(str(player.score), True, WHITE)
-            #     player_score_text_rect = player_score_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
-            #     screen.blit(player_score_text, player_score_text_rect)
-
             pygame.draw.rect(screen, WHITE, input_rect, 2)
             initials_text = SCORE_FONT.render(high_score_input.initials, True, WHITE)
             screen.blit(initials_text, input_rect.move(5, 8))
